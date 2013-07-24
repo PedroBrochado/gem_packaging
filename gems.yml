@@ -1,6 +1,4 @@
 gems:
-  cucumber:
-    version: 1.3.4
-
-  nokogiri:
-    version: nil
+  cucumber: 1.3.4
+  nokogiri: nil
+  selenium-webdriver: nil
