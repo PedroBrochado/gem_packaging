@@ -56,12 +56,17 @@ module GemPackager
 			def get_correct_gem_version gem_info, gems_array
 				gem_name = gem_info.keys[0]
 				gem_version = normalize_gem_version(gem_info.values[0])
+				default_version = Hash.new
+				default_version['number'] = '0.0.0'
 				gems_array.each { |version|
-					if version["number"].eql? gem_version
+					if version['number'].eql? gem_version
 						return version
+					elsif version['number'] > default_version['number']
+						default_version = version
 					end
 				}
-				raise Exception, "The version #{gem_version} doesn't exist!"
+				return default_version
+				# raise Exception, "The version #{gem_version} doesn't exist!"
 			end
 
 			def get_gem_dependencies gem_info
