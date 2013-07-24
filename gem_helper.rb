@@ -69,6 +69,10 @@ module GemPackager
 				# raise Exception, "The version #{gem_version} doesn't exist!"
 			end
 
+			def on_yum? gem_name, gem_version
+				return system("yum list rubygem-#{gem_name}-#{gem_version} --showduplicates")
+			end
+
 			def get_gem_dependencies gem_info
 				gem_name = gem_info.keys[0]
 				gem_version = gem_info.values[0]
@@ -116,7 +120,9 @@ module GemPackager
 				string = ''
 				array.reverse_each { |gem|
 					name, version = gem.keys[0], normalize_gem_version(gem.values[0])
-					string = string + "#{name}-#{version}.gem "
+					unless on_yum? name, version
+						string = string + "#{name}-#{version}.gem "
+					end
 				}
 				return string
 			end
