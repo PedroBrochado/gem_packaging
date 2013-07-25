@@ -36,17 +36,20 @@ module GemPackager
 				end
 			end
 
-			def get_last_gem_version gem_name
-				uri = URI("https://#{@@url}gems/#{gem_name}.#{@@format}")
+			def http_call uri
 				if proxy.nil?
-					result = Net::HTTP.get(uri)
+					result = Net::HTTP.get(URI(uri))
 				else
 					proxy_uri = URI.parse(proxy)
-					Net::HTTP::Proxy(proxy_uri.host, proxy_uri.port).start(uri.host) do |http|
-						result = http.get('/')
-					end
+					http = Net::HTTP::Proxy(proxy_uri.host, proxy_uri.port)
+					result = http.get_response(URI.parse(uri)).body
 				end
-				return JSON.parse(result)['version']
+				return result
+			end
+
+			def get_last_gem_version gem_name
+				uri = "http://#{@@url}gems/#{gem_name}.#{@@format}"
+				return JSON.parse(http_call(uri))['version']
 			end
 
 			def normalize_gem_version gem_version
@@ -86,8 +89,8 @@ module GemPackager
 				gem_name = gem_info.keys[0]
 				gem_version = gem_info.values[0]
 
-				uri = URI("https://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_name}")
-				info = JSON.parse(Net::HTTP.get(uri))
+				uri = "http://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_name}")
+				info = JSON.parse(http_call(uri))
 				fetched_information = get_correct_gem_version gem_info, info
 
 				unless fetched_information["dependencies"].empty?
