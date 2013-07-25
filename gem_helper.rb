@@ -16,7 +16,7 @@ module GemPackager
 		@@url = "rubygems.org/api/v1/"
 
 		class << self
-			attr_accessor :gem, :version, :file, :output, :debug
+			attr_accessor :gem, :version, :file, :output, :debug, :proxy
 
 			def load
 				if file.nil?
@@ -38,7 +38,15 @@ module GemPackager
 
 			def get_last_gem_version gem_name
 				uri = URI("https://#{@@url}gems/#{gem_name}.#{@@format}")
-				return JSON.parse(Net::HTTP.get(uri))['version']
+				if proxy.nil?
+					result = Net::HTTP.get(uri)
+				else
+					proxy_uri = URI.parse(proxy)
+					Net::HTTP::Proxy(proxy_uri.host, proxy_uri.port).start(uri.host) do |http|
+						result = http.get('/')
+					end
+				end
+				return JSON.parse(result)['version']
 			end
 
 			def normalize_gem_version gem_version
@@ -151,26 +159,30 @@ module GemPackager
 	class GemHelperParser
 		def self.parse args
 			opts = OptionParser.new do |parser|
-        parser.separator 'Specific Options:'
+				parser.separator 'Specific Options:'
 
-        parser.on('-f', '--file FILE', 'File Containing the Gems to Pack') do |file|
-        	GemHelper.file = file
-        end
+				parser.on('-f', '--file FILE', 'File Containing the Gems to Pack') do |file|
+					GemHelper.file = file
+				end
 
-        parser.on('-g', '--gem GEM', 'Gem to Pack') do |gem|
-        	GemHelper.gem = gem
-        end
+				parser.on('-g', '--gem GEM', 'Gem to Pack') do |gem|
+					GemHelper.gem = gem
+				end
 
-        parser.on('-v', '--version VERSION', 'Version of Gem to Pack. Used WITH --gem') do |version|
-        	GemHelper.version = version
-        end
+				parser.on('-v', '--version VERSION', 'Version of Gem to Pack. Used WITH --gem') do |version|
+					GemHelper.version = version
+				end
 
-        parser.separator 'Common Options:'
-        parser.on('-d', '--debug', 'Run in Debug Mode') do
-        	GemHelper.debug = true
-        end
+				parser.on('-p', '--proxy PROXY', 'Proxy to use') do |proxy|
+					GemHelper.proxy = proxy
+				end
 
-        parser.on('-h', '--help', 'Show Script Helper' ) do
+				parser.separator 'Common Options:'
+				parser.on('-d', '--debug', 'Run in Debug Mode') do
+					GemHelper.debug = true
+				end
+
+				parser.on('-h', '--help', 'Show Script Helper' ) do
 					puts parser.help
 					exit
 				end
