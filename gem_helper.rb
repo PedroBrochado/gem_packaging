@@ -89,7 +89,7 @@ module GemPackager
 				gem_name = gem_info.keys[0]
 				gem_version = gem_info.values[0]
 
-				uri = "http://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_name}")
+				uri = "http://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_name}"
 				info = JSON.parse(http_call(uri))
 				fetched_information = get_correct_gem_version gem_info, info
 
