@@ -3,7 +3,7 @@
 
 ###
 ### example of use: ruby gem_helper -f gemlist.yml -p http://proxy:port
-### 
+###
 
 require 'singleton'
 require 'optparse'
@@ -178,7 +178,7 @@ module GemPackager
 				hash.each_pair { |name, val|
 					gem_array = name.to_a
 					version, symbol = process_version_symbol(name)
-					string = "#{gem_array[0][0]} = #{version}"
+					string = "#{gem_array[0][0]} #{version}"
 					puts "#{tab} #{string}"
 					print_dependency_tree val, level + 1 unless val.nil?
 				}
