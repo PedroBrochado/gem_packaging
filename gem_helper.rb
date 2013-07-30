@@ -1,6 +1,10 @@
 #!/usr/bin/ruby
 # encoding: utf-8
 
+###
+### example of use: ruby gem_helper -f gemlist.yml -p http://proxy:port
+### 
+
 require 'singleton'
 require 'optparse'
 require 'yaml'
@@ -53,32 +57,47 @@ module GemPackager
 			end
 
 			def normalize_gem_version gem_version
-				if debug
-					puts gem_version
-				end
+				symbol = nil
 				if gem_version.include? ' '
+					symbol = gem_version.split(' ')[0]
 					gem_version = gem_version.split(' ')[1]
 				end
 				if gem_version.length < 5
 					gem_version = gem_version + ".0"
 				end
-				return gem_version
+				return gem_version, symbol
+			end
+
+			def process_version_symbol gem_info, gems_array = nil
+				version, symbol = normalize_gem_version(gem_info.values[0])
+				case symbol
+				when '>='
+					return get_last_gem_version gem_info.keys[0]
+				when '~>'
+					unless gems_array
+						uri = "http://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_info.keys[0]}"
+						gems_array = JSON.parse(http_call(uri))
+					end
+					default = '0.0.0'
+					superior = "#{version[0].to_i + 1}.0.0"
+					gems_array.each { |version|
+						if version['number'] >= default && version['number'] < superior
+							default = version['number']
+						end
+					}
+					return default
+				else
+					return version
+				end
 			end
 
 			def get_correct_gem_version gem_info, gems_array
-				gem_name = gem_info.keys[0]
-				gem_version = normalize_gem_version(gem_info.values[0])
-				default_version = Hash.new
-				default_version['number'] = '0.0.0'
+				gem_version = process_version_symbol gem_info
 				gems_array.each { |version|
 					if version['number'].eql? gem_version
 						return version
-					elsif version['number'] > default_version['number']
-						default_version = version
 					end
 				}
-				return default_version
-				# raise Exception, "The version #{gem_version} doesn't exist!"
 			end
 
 			def on_yum? gem_name, gem_version
@@ -93,10 +112,17 @@ module GemPackager
 				info = JSON.parse(http_call(uri))
 				fetched_information = get_correct_gem_version gem_info, info
 
+				if debug
+					puts "fetched_information: #{fetched_information}"
+				end
+
 				unless fetched_information["dependencies"].empty?
 					current_deps = {}
 					fetched_information["dependencies"].each { |dependency|
 						info = Hash[dependency[0], dependency[1]]
+						if debug
+							puts dependency
+						end
 						current_deps.store(info, get_gem_dependencies(info))
 					}
 					return current_deps
@@ -131,7 +157,7 @@ module GemPackager
 				array = analyze_gem_version(get_dependencies_array(hash))
 				string = ''
 				array.reverse_each { |gem|
-					name, version = gem.keys[0], normalize_gem_version(gem.values[0])
+					name, version = gem.keys[0], process_version_symbol(gem)
 					unless on_yum? name, version
 						string = string + "#{name}-#{version}.gem "
 					end
@@ -151,7 +177,8 @@ module GemPackager
 				tab = '└' + '─' * (level * 2 + 1)
 				hash.each_pair { |name, val|
 					gem_array = name.to_a
-					string = "#{gem_array[0][0]} #{gem_array[0][1]}"
+					version, symbol = process_version_symbol(name)
+					string = "#{gem_array[0][0]} = #{version}"
 					puts "#{tab} #{string}"
 					print_dependency_tree val, level + 1 unless val.nil?
 				}
