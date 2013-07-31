@@ -10,6 +10,7 @@ require 'optparse'
 require 'yaml'
 require 'json'
 require 'net/http'
+require "net/sftp"
 
 module GemPackager
 	class GemHelper
@@ -20,7 +21,7 @@ module GemPackager
 		@@url = "rubygems.org/api/v1/"
 
 		class << self
-			attr_accessor :gem, :version, :file, :output, :debug, :proxy
+			attr_accessor :gem, :version, :file, :output, :debug, :proxy, :ftp
 
 			def load
 				if file.nil?
@@ -183,6 +184,17 @@ module GemPackager
 					print_dependency_tree val, level + 1 unless val.nil?
 				}
 			end
+
+			#
+			# files can be a string as "*.rpm" ?
+			#
+			def send_rpms_to_ftp files, ftp, ftp_folder, username = nil, password = nil
+				Net::SFTP.start(ftp, username, :password => password) do |sftp|
+					Dir.glob(files).each { |file|
+						sftp.upload!(file, "#{ftp_folder}/#{file}")
+					}
+				end
+			end
 		end
 	end
 
@@ -203,11 +215,15 @@ module GemPackager
 					GemHelper.version = version
 				end
 
+				parser.on('-u', '--upload FTP', "") do |ftp|
+					GemHelper.ftp = ftp
+				end
+
+				parser.separator 'Common Options:'
 				parser.on('-p', '--proxy PROXY', 'Proxy to use') do |proxy|
 					GemHelper.proxy = proxy
 				end
 
-				parser.separator 'Common Options:'
 				parser.on('-d', '--debug', 'Run in Debug Mode') do
 					GemHelper.debug = true
 				end
@@ -223,10 +239,12 @@ module GemPackager
 	end
 end
 
-GemPackager::GemHelperParser.parse(ARGV)
-GemPackager::GemHelper.load
+# GemPackager::GemHelperParser.parse(ARGV)
+# GemPackager::GemHelper.load
 
-gem_hash = GemPackager::GemHelper.get_gem_list
+# gem_hash = GemPackager::GemHelper.get_gem_list
 
-GemPackager::GemHelper.print_dependency_tree gem_hash
-puts GemPackager::GemHelper.get_dependencies_string gem_hash
+# GemPackager::GemHelper.print_dependency_tree gem_hash
+# puts GemPackager::GemHelper.get_dependencies_string gem_hash
+
+GemPackager::GemHelper.send_rpms_to_ftp '*.rpm', '10.112.26.247', '/opt/jenkins', 'jenkins', 'jenkins'
