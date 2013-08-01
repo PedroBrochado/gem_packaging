@@ -53,8 +53,13 @@ module GemPackager
 				return result
 			end
 
-			def get_last_version_of_gem gem_name
+			def get_last_version gem_name
 				uri = "http://#{@@url}gems/#{gem_name}.#{@@format}"
+				return JSON.parse(http_call(uri))
+			end
+
+			def get_specific_version gem_name
+				uri = "http://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_name}"
 				return JSON.parse(http_call(uri))
 			end
 
@@ -77,8 +82,7 @@ module GemPackager
 					return get_last_version_of_gem(gem_info.keys[0])['version']
 				when '~>'
 					unless gems_array
-						uri = "http://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_info.keys[0]}"
-						gems_array = JSON.parse(http_call(uri))
+						gems_array = get_specific_version gem_info.keys[0]
 					end
 					default = '0.0.0'
 					superior = Gem::Version.new("#{version[0].to_i + 1}.0.0")
@@ -111,9 +115,7 @@ module GemPackager
 				gem_name = gem_info.keys[0]
 				gem_version = gem_info.values[0]
 
-				uri = "http://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_name}"
-				info = JSON.parse(http_call(uri))
-				fetched_information = get_correct_gem_version gem_info, info
+				fetched_information = get_correct_gem_version(gem_info, get_specific_version(gem_name))
 
 				if debug
 					puts "fetched_information: #{fetched_information}"
@@ -199,13 +201,12 @@ module GemPackager
 			end
 
 			def create_wiki_page gem_info
-				uri = "http://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_info.keys[0]}"
-				info = JSON.parse(http_call(uri))
-				fetched_information = get_correct_gem_version gem_info, info
+				fetched_information = get_correct_gem_version(gem_info, get_specific_version(gem_info.keys[0]))
 
 				browser = Watir::Browser.new
 				browser.goto 'http://jira.ptin.corppt.com/secure/?os_username=ci-tc&os_password=c1-tc'
 
+				# de momento está a ser usado um link na nossa wiki
 				# browser.goto 'http://wiki.ptin.corppt.com/display/EXMIRRORS/Lista+de+Componentes+Empacotados'
 				browser.goto 'http://wiki.ptin.corppt.com/display/TESTC/Manuais'
 
@@ -218,6 +219,8 @@ module GemPackager
 				}
 				html_string << '</ul></li>'
 
+				iframe = browser.frame(:id, 'wysiwygTextarea_ifr')
+				addition_type = ''
 				insert_on = nil
 
 				if new_page
@@ -228,19 +231,16 @@ module GemPackager
 
 					html_string = full_page
 
-					iframe = browser.frame(:id, 'wysiwygTextarea_ifr')
 					insert_on = iframe.body(:id, 'tinymce')
-
-					script = "return arguments[0].innerHTML = ''"
-					iframe.execute_script script, insert_on
+					addition_type = '='
 				else
 					browser.span(:text, 'Edit').click
 
-					iframe = browser.frame(:id, 'wysiwygTextarea_ifr')
 					insert_on = iframe.ul(:xpath, '//h1[contains(text(),"Dependências")]/following-sibling::ul')
+					addition_type = '+='
 				end
 
-				script ="return arguments[0].innerHTML += '#{html_string}'"
+				script ="return arguments[0].innerHTML #{addition_type} '#{html_string}'"
 
 				iframe.execute_script script, insert_on
 				browser.button(:id, 'rte-button-publish').click
