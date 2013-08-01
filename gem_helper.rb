@@ -219,11 +219,10 @@ module GemPackager
 				html_string << '</ul></li>'
 
 				insert_on = nil
-				puts new_page
 
 				if new_page
 					full_page = "<h1>Descrição</h1><p>#{get_last_version_of_gem(gem_info.keys[0])['info']}</p>"
-					full_page << "<h1>Dependencias</h1><ul>#{html_string}</ul>"
+					full_page << "<h1>Dependências</h1><ul>#{html_string}</ul>"
 					full_page << "<h1>Licença</h1><p>MIT</p>"
 					full_page << "<h1>Equipa</h1><p>Mauro Rodrigues</p>"
 
@@ -240,7 +239,7 @@ module GemPackager
 					iframe = browser.frame(:id, 'wysiwygTextarea_ifr')
 					insert_on = iframe.ul(:xpath, '//h1[contains(text(),"Dependências")]/following-sibling::ul')
 				end
-				puts html_string
+
 				script ="return arguments[0].innerHTML += '#{html_string}'"
 
 				iframe.execute_script script, insert_on
@@ -299,4 +298,4 @@ GemPackager::GemHelper.load
 # puts GemPackager::GemHelper.get_dependencies_string gem_hash
 
 # GemPackager::GemHelper.send_rpms_to_ftp '*.rpm', '10.112.26.247', '/opt/jenkins', 'jenkins', 'jenkins'
-GemPackager::GemHelper.create_wiki_page Hash["watir-webdriver" , '0.6.4']
+GemPackager::GemHelper.create_wiki_page Hash["watir-webdriver" , '0.6.3']
