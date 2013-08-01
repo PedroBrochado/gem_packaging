@@ -11,6 +11,7 @@ require 'yaml'
 require 'json'
 require 'net/http'
 require "net/sftp"
+require 'watir-webdriver'
 
 module GemPackager
 	class GemHelper
@@ -32,7 +33,7 @@ module GemPackager
 
 				@@gem_list.each_pair { |name, val|
 					if val.eql? 'nil' or val.nil?
-						@@gem_list[name] = get_last_gem_version name
+						@@gem_list[name] = get_last_version_of_gem(name)['version']
 					end
 				}
 
@@ -52,9 +53,9 @@ module GemPackager
 				return result
 			end
 
-			def get_last_gem_version gem_name
+			def get_last_version_of_gem gem_name
 				uri = "http://#{@@url}gems/#{gem_name}.#{@@format}"
-				return JSON.parse(http_call(uri))['version']
+				return JSON.parse(http_call(uri))
 			end
 
 			def normalize_gem_version gem_version
@@ -73,16 +74,17 @@ module GemPackager
 				version, symbol = normalize_gem_version(gem_info.values[0])
 				case symbol
 				when '>='
-					return get_last_gem_version gem_info.keys[0]
+					return get_last_version_of_gem(gem_info.keys[0])['version']
 				when '~>'
 					unless gems_array
 						uri = "http://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_info.keys[0]}"
 						gems_array = JSON.parse(http_call(uri))
 					end
 					default = '0.0.0'
-					superior = "#{version[0].to_i + 1}.0.0"
+					superior = Gem::Version.new("#{version[0].to_i + 1}.0.0")
 					gems_array.each { |version|
-						if version['number'] >= default && version['number'] < superior
+						gem_version = Gem::Version.new(version['number'])
+						if gem_version >= Gem::Version.new(default) && gem_version < superior
 							default = version['number']
 						end
 					}
@@ -195,6 +197,55 @@ module GemPackager
 					}
 				end
 			end
+
+			def create_wiki_page gem_info
+				uri = "http://bundler.#{@@url}dependencies.#{@@format}?gems=#{gem_info.keys[0]}"
+				info = JSON.parse(http_call(uri))
+				fetched_information = get_correct_gem_version gem_info, info
+
+				browser = Watir::Browser.new
+				browser.goto 'http://jira.ptin.corppt.com/secure/?os_username=ci-tc&os_password=c1-tc'
+
+				# browser.goto 'http://wiki.ptin.corppt.com/display/EXMIRRORS/Lista+de+Componentes+Empacotados'
+				browser.goto 'http://wiki.ptin.corppt.com/display/TESTC/Manuais'
+
+				new_page = browser.link(:text, "rubygem-#{gem_info.keys[0]}").class_name.eql? 'createlink'
+				browser.link(:text, "rubygem-#{gem_info.keys[0]}").click
+
+				html_string = "<li>versão #{gem_info.values[0]}<ul>"
+				fetched_information["dependencies"].each { |dependency|
+					html_string << "<li>#{dependency[0]} #{dependency[1].gsub('>', '&gt;')}</li>"
+				}
+				html_string << '</ul></li>'
+
+				insert_on = nil
+				puts new_page
+
+				if new_page
+					full_page = "<h1>Descrição</h1><p>#{get_last_version_of_gem(gem_info.keys[0])['info']}</p>"
+					full_page << "<h1>Dependencias</h1><ul>#{html_string}</ul>"
+					full_page << "<h1>Licença</h1><p>MIT</p>"
+					full_page << "<h1>Equipa</h1><p>Mauro Rodrigues</p>"
+
+					html_string = full_page
+
+					iframe = browser.frame(:id, 'wysiwygTextarea_ifr')
+					insert_on = iframe.body(:id, 'tinymce')
+
+					script = "return arguments[0].innerHTML = ''"
+					iframe.execute_script script, insert_on
+				else
+					browser.span(:text, 'Edit').click
+
+					iframe = browser.frame(:id, 'wysiwygTextarea_ifr')
+					insert_on = iframe.ul(:xpath, '//h1[contains(text(),"Dependências")]/following-sibling::ul')
+				end
+				puts html_string
+				script ="return arguments[0].innerHTML += '#{html_string}'"
+
+				iframe.execute_script script, insert_on
+				browser.button(:id, 'rte-button-publish').click
+			end
 		end
 	end
 
@@ -239,12 +290,13 @@ module GemPackager
 	end
 end
 
-# GemPackager::GemHelperParser.parse(ARGV)
-# GemPackager::GemHelper.load
+GemPackager::GemHelperParser.parse(ARGV)
+GemPackager::GemHelper.load
 
 # gem_hash = GemPackager::GemHelper.get_gem_list
 
 # GemPackager::GemHelper.print_dependency_tree gem_hash
 # puts GemPackager::GemHelper.get_dependencies_string gem_hash
 
-GemPackager::GemHelper.send_rpms_to_ftp '*.rpm', '10.112.26.247', '/opt/jenkins', 'jenkins', 'jenkins'
+# GemPackager::GemHelper.send_rpms_to_ftp '*.rpm', '10.112.26.247', '/opt/jenkins', 'jenkins', 'jenkins'
+GemPackager::GemHelper.create_wiki_page Hash["watir-webdriver" , '0.6.4']
