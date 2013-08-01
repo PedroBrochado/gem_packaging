@@ -33,7 +33,7 @@ module GemPackager
 
 				@@gem_list.each_pair { |name, val|
 					if val.eql? 'nil' or val.nil?
-						@@gem_list[name] = get_last_version_of_gem(name)['version']
+						@@gem_list[name] = get_last_version(name)['version']
 					end
 				}
 
@@ -79,7 +79,7 @@ module GemPackager
 				version, symbol = normalize_gem_version(gem_info.values[0])
 				case symbol
 				when '>='
-					return get_last_version_of_gem(gem_info.keys[0])['version']
+					return get_last_version(gem_info.keys[0])['version']
 				when '~>'
 					unless gems_array
 						gems_array = get_specific_version gem_info.keys[0]
@@ -200,18 +200,27 @@ module GemPackager
 				end
 			end
 
-			def create_wiki_page gem_info
-				fetched_information = get_correct_gem_version(gem_info, get_specific_version(gem_info.keys[0]))
+			def create_wiki_pages gems
+				gems_array = analyze_gem_version gems
+				@@browser = Watir::Browser.new
+				@@browser.goto 'http://jira.ptin.corppt.com/secure/?os_username=ci-tc&os_password=c1-tc'
 
-				browser = Watir::Browser.new
-				browser.goto 'http://jira.ptin.corppt.com/secure/?os_username=ci-tc&os_password=c1-tc'
+				gems_array.each { |gem_hash|
+					create_gem_wiki_page gem_hash
+					puts Hash[gem_hash.keys[0], process_version_symbol(gem_hash)]
+				}
+				@@browser.close
+			end
+
+			def create_gem_wiki_page gem_info
+				fetched_information = get_correct_gem_version(gem_info, get_specific_version(gem_info.keys[0]))
 
 				# de momento está a ser usado um link na nossa wiki
 				# browser.goto 'http://wiki.ptin.corppt.com/display/EXMIRRORS/Lista+de+Componentes+Empacotados'
-				browser.goto 'http://wiki.ptin.corppt.com/display/TESTC/Manuais'
+				@@browser.goto 'http://wiki.ptin.corppt.com/display/TESTC/Manuais'
 
-				new_page = browser.link(:text, "rubygem-#{gem_info.keys[0]}").class_name.eql? 'createlink'
-				browser.link(:text, "rubygem-#{gem_info.keys[0]}").click
+				new_page = @@browser.link(:text, "rubygem-#{gem_info.keys[0]}").class_name.eql? 'createlink'
+				@@browser.link(:text, "rubygem-#{gem_info.keys[0]}").click
 
 				html_string = "<li>versão #{gem_info.values[0]}<ul>"
 				fetched_information["dependencies"].each { |dependency|
@@ -219,12 +228,12 @@ module GemPackager
 				}
 				html_string << '</ul></li>'
 
-				iframe = browser.frame(:id, 'wysiwygTextarea_ifr')
+				iframe = @@browser.frame(:id, 'wysiwygTextarea_ifr')
 				addition_type = ''
 				insert_on = nil
 
 				if new_page
-					full_page = "<h1>Descrição</h1><p>#{get_last_version_of_gem(gem_info.keys[0])['info']}</p>"
+					full_page = "<h1>Descrição</h1><p>#{get_last_version(gem_info.keys[0])['info']}</p>"
 					full_page << "<h1>Dependências</h1><ul>#{html_string}</ul>"
 					full_page << "<h1>Licença</h1><p>MIT</p>"
 					full_page << "<h1>Equipa</h1><p>Mauro Rodrigues</p>"
@@ -243,7 +252,7 @@ module GemPackager
 				script ="return arguments[0].innerHTML #{addition_type} '#{html_string}'"
 
 				iframe.execute_script script, insert_on
-				browser.button(:id, 'rte-button-publish').click
+				@@browser.button(:id, 'rte-button-publish').click
 			end
 		end
 	end
@@ -292,10 +301,11 @@ end
 GemPackager::GemHelperParser.parse(ARGV)
 GemPackager::GemHelper.load
 
-# gem_hash = GemPackager::GemHelper.get_gem_list
+gem_hash = GemPackager::GemHelper.get_gem_list
+gem_array = GemPackager::GemHelper.get_dependencies_array gem_hash
 
-# GemPackager::GemHelper.print_dependency_tree gem_hash
-# puts GemPackager::GemHelper.get_dependencies_string gem_hash
+GemPackager::GemHelper.print_dependency_tree gem_hash
+puts GemPackager::GemHelper.get_dependencies_string gem_hash
 
-# GemPackager::GemHelper.send_rpms_to_ftp '*.rpm', '10.112.26.247', '/opt/jenkins', 'jenkins', 'jenkins'
-GemPackager::GemHelper.create_wiki_page Hash["watir-webdriver" , '0.6.3']
+GemPackager::GemHelper.send_rpms_to_ftp '*.rpm', '10.112.26.247', '/opt/jenkins', 'jenkins', 'jenkins'
+GemPackager::GemHelper.create_wiki_pages gem_array
