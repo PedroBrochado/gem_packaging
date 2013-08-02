@@ -11,7 +11,8 @@ require 'yaml'
 require 'json'
 require 'net/http'
 require "net/sftp"
-require 'watir-webdriver'
+require 'capybara'
+require 'capybara/poltergeist'
 
 module GemPackager
 	class GemHelper
@@ -202,8 +203,9 @@ module GemPackager
 
 			def create_wiki_pages gems
 				gems_array = analyze_gem_version gems
-				@@browser = Watir::Browser.new
-				@@browser.goto 'http://jira.ptin.corppt.com/secure/?os_username=ci-tc&os_password=c1-tc'
+				@@browser = Capybara::Session.new :poltergeist
+				@@browser.visit 'http://jira.ptin.corppt.com/secure/?os_username=ci-tc&os_password=c1-tc'
+				@@browser.save_screenshot('jira.png')
 
 				gems_array.each { |gem_hash|
 					create_gem_wiki_page gem_hash
@@ -216,11 +218,13 @@ module GemPackager
 				fetched_information = get_correct_gem_version(gem_info, get_specific_version(gem_info.keys[0]))
 
 				# de momento está a ser usado um link na nossa wiki
-				# browser.goto 'http://wiki.ptin.corppt.com/display/EXMIRRORS/Lista+de+Componentes+Empacotados'
-				@@browser.goto 'http://wiki.ptin.corppt.com/display/TESTC/Manuais'
+				# browser.visit 'http://wiki.ptin.corppt.com/display/EXMIRRORS/Lista+de+Componentes+Empacotados'
+				@@browser.visit 'http://wiki.ptin.corppt.com/display/TESTC/Manuais'
+				@@browser.save_screenshot('manuais.png')
 
-				new_page = @@browser.link(:text, "rubygem-#{gem_info.keys[0]}").class_name.eql? 'createlink'
-				@@browser.link(:text, "rubygem-#{gem_info.keys[0]}").click
+				new_page = @@browser.has_css? 'createlink'
+				@@browser.click_link "rubygem-#{gem_info.keys[0]}"
+				@@browser.save_screenshot('rubygem.png')
 
 				html_string = "<li>versão #{gem_info.values[0]}<ul>"
 				fetched_information["dependencies"].each { |dependency|
@@ -228,7 +232,6 @@ module GemPackager
 				}
 				html_string << '</ul></li>'
 
-				iframe = @@browser.frame(:id, 'wysiwygTextarea_ifr')
 				addition_type = ''
 				insert_on = nil
 
@@ -240,19 +243,28 @@ module GemPackager
 
 					html_string = full_page
 
-					insert_on = iframe.body(:id, 'tinymce')
+					element = '//*[@id="tinymce"]'
 					addition_type = '='
 				else
-					browser.span(:text, 'Edit').click
+					@@browser.click_link 'Edit'
+					@@browser.save_screenshot 'edit_gem.png'
 
-					insert_on = iframe.ul(:xpath, '//h1[contains(text(),"Dependências")]/following-sibling::ul')
+					element = '//h1[contains(text(),\'Dependências\')]/following-sibling::ul'
 					addition_type = '+='
 				end
 
-				script ="return arguments[0].innerHTML #{addition_type} '#{html_string}'"
+				script ="this.evaluate('#{element}', this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null).innerHTML #{addition_type} '#{html_string}'"
+				puts script
 
-				iframe.execute_script script, insert_on
-				@@browser.button(:id, 'rte-button-publish').click
+				@@browser.save_screenshot 'before_frame.png'
+
+				@@browser.within_frame 'wysiwygTextarea_ifr' do
+					@@browser.execute_script \"this.evaluate('#{element}', this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null).innerHTML #{addition_type} '#{html_string}'"
+				end
+
+				@@browser.save_screenshot 'addition.png'
+				@@browser.click_button 'rte-button-publish'
+				@@browser.save_screenshot 'after_addition.png'
 			end
 		end
 	end
@@ -304,8 +316,8 @@ GemPackager::GemHelperParser.parse(ARGV)
 gem_hash = GemPackager::GemHelper.get_gem_list
 gem_array = GemPackager::GemHelper.get_dependencies_array gem_hash
 
-GemPackager::GemHelper.print_dependency_tree gem_hash
-puts GemPackager::GemHelper.get_dependencies_string gem_hash
+# GemPackager::GemHelper.print_dependency_tree gem_hash
+# puts GemPackager::GemHelper.get_dependencies_string gem_hash
 
-GemPackager::GemHelper.send_rpms_to_ftp '*.rpm', '10.112.26.247', '/opt/jenkins', 'jenkins', 'jenkins'
+# GemPackager::GemHelper.send_rpms_to_ftp '*.rpm', '10.112.26.247', '/opt/jenkins', 'jenkins', 'jenkins'
 GemPackager::GemHelper.create_wiki_pages gem_array
