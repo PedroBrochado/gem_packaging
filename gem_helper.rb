@@ -294,12 +294,12 @@ module GemPackager
 			end
 
 			opts.parse!(args)
+			GemHelper.load
 		end
 	end
 end
 
 GemPackager::GemHelperParser.parse(ARGV)
-GemPackager::GemHelper.load
 
 gem_hash = GemPackager::GemHelper.get_gem_list
 gem_array = GemPackager::GemHelper.get_dependencies_array gem_hash
