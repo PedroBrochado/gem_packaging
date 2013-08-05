@@ -205,7 +205,6 @@ module GemPackager
 				gems_array = analyze_gem_version gems
 				@@browser = Capybara::Session.new :poltergeist
 				@@browser.visit 'http://jira.ptin.corppt.com/secure/?os_username=ci-tc&os_password=c1-tc'
-				@@browser.save_screenshot('jira.png')
 
 				gems_array.each { |gem_hash|
 					create_gem_wiki_page gem_hash
@@ -220,11 +219,9 @@ module GemPackager
 				# de momento está a ser usado um link na nossa wiki
 				# browser.visit 'http://wiki.ptin.corppt.com/display/EXMIRRORS/Lista+de+Componentes+Empacotados'
 				@@browser.visit 'http://wiki.ptin.corppt.com/display/TESTC/Manuais'
-				@@browser.save_screenshot('manuais.png')
 
 				new_page = @@browser.has_css? 'createlink'
 				@@browser.click_link "rubygem-#{gem_info.keys[0]}"
-				@@browser.save_screenshot('rubygem.png')
 
 				html_string = "<li>versão #{gem_info.values[0]}<ul>"
 				fetched_information["dependencies"].each { |dependency|
@@ -243,28 +240,23 @@ module GemPackager
 
 					html_string = full_page
 
-					element = '//*[@id="tinymce"]'
+					element = 'document.getElementById("tinymce")'
 					addition_type = '='
 				else
 					@@browser.click_link 'Edit'
-					@@browser.save_screenshot 'edit_gem.png'
 
-					element = '//h1[contains(text(),\'Dependências\')]/following-sibling::ul'
+					element = '(document.getElementsByTagName("h1")[1]).nextSibling'
 					addition_type = '+='
 				end
 
-				script ="this.evaluate('#{element}', this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null).innerHTML #{addition_type} '#{html_string}'"
+				script ="#{element}.innerHTML #{addition_type} '#{html_string}'"
 				puts script
 
-				@@browser.save_screenshot 'before_frame.png'
-
 				@@browser.within_frame 'wysiwygTextarea_ifr' do
-					@@browser.execute_script \"this.evaluate('#{element}', this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null).innerHTML #{addition_type} '#{html_string}'"
+					@@browser.execute_script script
 				end
 
-				@@browser.save_screenshot 'addition.png'
 				@@browser.click_button 'rte-button-publish'
-				@@browser.save_screenshot 'after_addition.png'
 			end
 		end
 	end
