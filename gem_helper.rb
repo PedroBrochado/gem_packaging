@@ -71,7 +71,7 @@ module GemPackager
 					symbol = gem_version.split(' ')[0]
 					gem_version = gem_version.split(' ')[1]
 				end
-				while gem_version.count '.' < 2
+				while gem_version.count('.') < 2
 					gem_version << ".0"
 				end
 				return gem_version, symbol
@@ -283,7 +283,7 @@ module GemPackager
 					GemHelper.version = version
 				end
 
-				parser.on('-u', '--upload FTP', "") do |ftp|
+				parser.on('-u', '--upload FTP', "FTP to commit files") do |ftp|
 					GemHelper.ftp = ftp
 				end
 
