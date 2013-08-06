@@ -66,12 +66,13 @@ module GemPackager
 
 			def normalize_gem_version gem_version
 				symbol = nil
+        gem_version.gsub!(',', '')
 				if gem_version.include? ' '
 					symbol = gem_version.split(' ')[0]
 					gem_version = gem_version.split(' ')[1]
 				end
-				if gem_version.length < 5
-					gem_version = gem_version + ".0"
+				while gem_version.count '.' < 2
+					gem_version << ".0"
 				end
 				return gem_version, symbol
 			end
@@ -81,12 +82,16 @@ module GemPackager
 				case symbol
 				when '>='
 					return get_last_version(gem_info.keys[0])['version']
-				when '~>'
+				when '~>', '<'
 					unless gems_array
 						gems_array = get_specific_version gem_info.keys[0]
 					end
 					default = '0.0.0'
-					superior = Gem::Version.new("#{version[0].to_i + 1}.0.0")
+					if symbol.eql? '<'
+						superior = Gem::Version.new(version)
+					else
+						superior = Gem::Version.new("#{version[0].to_i + 1}.0.0")
+					end
 					gems_array.each { |version|
 						gem_version = Gem::Version.new(version['number'])
 						if gem_version >= Gem::Version.new(default) && gem_version < superior
@@ -308,8 +313,8 @@ GemPackager::GemHelperParser.parse(ARGV)
 gem_hash = GemPackager::GemHelper.get_gem_list
 gem_array = GemPackager::GemHelper.get_dependencies_array gem_hash
 
-# GemPackager::GemHelper.print_dependency_tree gem_hash
-# puts GemPackager::GemHelper.get_dependencies_string gem_hash
+GemPackager::GemHelper.print_dependency_tree gem_hash
+puts GemPackager::GemHelper.get_dependencies_string gem_hash
 
 # GemPackager::GemHelper.send_rpms_to_ftp '*.rpm', '10.112.26.247', '/opt/jenkins', 'jenkins', 'jenkins'
-GemPackager::GemHelper.create_wiki_pages gem_array
+# GemPackager::GemHelper.create_wiki_pages gem_array
